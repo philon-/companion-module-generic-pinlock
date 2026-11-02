@@ -1,6 +1,8 @@
-# companion-module-[replace with module name]
+# companion-module-generic-pinlock
 
-See [HELP.md](./companion/HELP.md) and [LICENSE](./LICENSE)
+PIN code lock for Bitfocus Companion surfaces. Each surface (e.g. a Companion Satellite) locks and unlocks independently, supports multiple users with their own PIN and landing page, and locks again after a period of inactivity.
+
+See [HELP.md](./companion/HELP.md), [ROADMAP.md](./ROADMAP.md) and [LICENSE](./LICENSE).
 
 ## Getting started
 

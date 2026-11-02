@@ -1,0 +1,97 @@
+# Roadmap
+
+What's built, what's deliberately out of scope, and what still needs verifying. Keep the checklists in sync as work lands.
+
+Target: **Companion v5.1.1** (latest at time of planning, 2026-11-02), `@companion-module/base` ~2.1.
+
+## Goal
+
+- Multiple independent satellites, each locked with a PIN. A correct PIN opens that user's landing page.
+- After a configurable number of seconds without activity, the satellite locks again.
+- Multiple users, each with their own PIN.
+- A session is active only on the satellite where the PIN was entered.
+
+## Phases
+
+- [x] **Planning.** Companion v5.1.1 source survey, architecture, decisions below.
+- [x] **Scaffold.** Repo from `bitfocus/companion-module-template-ts`, manifest/package identity, docs.
+- [ ] **Phase 0 — Spike.** Answer the [open questions](#open-questions-phase-0-spike) on a real Companion v5.1.1 install with at least one satellite.
+- [ ] **Phase 1 — Core.**
+  - [ ] Config: `users` (multiline `name, pin, landingPage`), `satellites` (multiline `surfaceId, lockPage[, label]`), `idleTimeout`, `pinLength`, `maxAttempts`, `cooldown`. Reject bad lines and duplicate PINs via connection status.
+  - [ ] Per-surface state: entry buffer, current user, idle timer, attempt counter.
+  - [ ] Actions: `digit` (0–9), `backspace`, `clear`, `submit` (or auto-submit at `pinLength`), `touch`, `logout`.
+  - [ ] Navigation channel: `nav_surface`, `nav_page`, `nav_seq`, with queued, spaced requests.
+  - [ ] Idle timeout: clear session and navigate to the lock page. Lock all satellites on startup.
+  - [ ] Log every lock, unlock and failed attempt with user and surface.
+- [ ] **Phase 2 — Buttons.**
+  - [ ] Feedbacks: `entry_display` (advanced: `●●○○`, "Wrong PIN", cooldown countdown) and `state` (boolean: locked / unlocked / error / cooldown), both with a `surface` option meant to be set to `$(page:surface_id)`.
+  - [ ] Variables per satellite: `<sat>_user`, `<sat>_locked`, `<sat>_remaining`; global `last_surface_id`.
+  - [ ] Presets: keypad, display, logout, countdown.
+- [ ] **Phase 3 — Hardening.**
+  - [ ] Attempt limit and cooldown.
+  - [ ] `lock_all` admin action.
+  - [ ] Upgrade scripts once option shapes have shipped.
+
+## Decisions
+
+| Question          | Decision                                     | Why                                                                                                                                    |
+| ----------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Lock page layout  | One lock page per satellite                  | Buttons render per page location, not per surface, so only a per-satellite page can show that satellite's PIN dots and error feedback. |
+| Inactivity source | `pinlock: touch` action on protected buttons | Modules only see presses on their own actions. Accurate and fully in our control; costs one extra action per protected button.         |
+| Landing page      | Per user                                     | Each user lands on the same page on every satellite.                                                                                   |
+| User storage      | Multiline `textinput` in module config       | Any number of users, edited in Companion. `secret-text` can't be multiline, so PINs are plain text in the config (and in exports).     |
+
+## Architecture
+
+The module owns all state. Companion does the one thing a module can't: change a surface's page.
+
+```
+press on satellite ──► pinlock action (event.surfaceId) ──► module state
+                                                               │
+                                     nav_surface / nav_page / nav_seq++
+                                                               │
+                         Companion trigger: "variable nav_seq changed"
+                                                               │
+                  Surface: Set to page (surface = $(pinlock:nav_surface),
+                                         page    = $(pinlock:nav_page))
+```
+
+Why not alternatives:
+
+- **Enter button with a follow-up "Set to page" action** — there's no `$(this:surface_id)` local variable in v5.1.1 (`this:` covers page/column/row/location/step/…), so a shared expression can't pick the per-surface landing page.
+- **Module calling Companion's TCP remote API** (`SURFACE <id> PAGE-SET <n>`) — works without a trigger but loops back into Companion and needs the TCP listener enabled. Fallback only.
+- **Companion's built-in PIN lockout** — one global PIN, no users, no landing page, and its keypad is fixed. Leave it disabled to avoid two locks.
+
+## Companion facts relied on (v5.1.1 source)
+
+- ✅ Module action events carry `surfaceId`; feedback events only carry `controlId` (`@companion-module/base` `module-api/action.d.ts`, `feedback.d.ts`).
+- ✅ Internal **Surface: Set to page** takes a `surfaceId` option (default `self`) that accepts expressions; `self` resolves to the pressing surface, any other value is used as the surface ID directly (`companion/lib/Internal/Surface.ts` `#fetchSurfaceId`).
+- ✅ Triggers have a "variable changed" event (`Controls/ControlTypes/Triggers/Events/Variable.ts`).
+- ✅ The "any button press" trigger event drops the surface ID (`Events/Misc.ts` `#onControlPress`), so it can't drive per-surface idle timers.
+- ✅ Page variables (`$(page:<name>)`) exist since v5.1.0 (`Controls/ControlTypes/Page.ts`). Page controls have no press hooks.
+- ✅ Internal variables `$(internal:surface_<id>_page)` and `_locked` exist per connected surface (`:` in IDs replaced by `_`).
+- ✅ Config field types include `textinput` with `multiline` and `secret-text`; feedback types include `advanced` (can set button text).
+
+## Open questions (Phase 0 spike)
+
+- [ ] Does the trigger move a satellite when `nav_surface` holds its surface ID (expression mode on both fields)?
+- [ ] Does `$(page:surface_id)` resolve inside a module feedback option expression on that page?
+- [ ] How does Companion batch `variables_changed`? Determines the spacing between queued navigation requests so simultaneous unlocks don't collapse into one trigger run.
+- [ ] Exact surface ID format for Companion Satellite devices (and whether it's stable across reconnects).
+
+## Companion setup the user does by hand
+
+1. Add the connection; fill users, satellites, timeout. Use `$(pinlock:last_surface_id)` to discover satellite IDs.
+2. Build the lock page template from presets and give it a page variable `surface_id`.
+3. Copy the lock page once per satellite; change only `surface_id`.
+4. Surfaces tab: set each satellite's startup page to its lock page.
+5. Create the navigation trigger (see [Architecture](#architecture)).
+6. Add `pinlock: touch` to every button on protected pages; add a Logout button.
+7. Remove page up/down/jump buttons from lock pages; on protected pages, keep navigation within protected pages. Leave Companion's built-in PIN lockout off.
+8. Set a Companion admin password and keep the emulator off untrusted networks.
+
+### Known limitations (accepted)
+
+- **Convenience lock, not access control.** Anyone with the Companion web UI or emulator can bypass it.
+- **Reconnects aren't observed.** A satellite that drops while unlocked comes back on its lock page (startup page), but the module's session stays open until the idle timer expires. A new PIN entry just starts a fresh session, so nothing is exposed.
+- **Activity outside `touch`** (e.g. a button without the touch action) doesn't extend the session.
