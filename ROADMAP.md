@@ -23,10 +23,11 @@ Target: **Companion v5.1.1** (latest at time of planning, 2026-11-02), `@compani
   - [x] Navigation channel: `nav_surface`, `nav_page`, `nav_seq`, with queued, spaced requests.
   - [x] Idle timeout: clear session and navigate to the lock page. Lock all satellites on startup and on every config change.
   - [x] Log every lock, unlock and failed attempt with user and surface.
-- [ ] **Phase 2 — Buttons.**
-  - [ ] Feedbacks: `entry_display` (advanced: `●●○○`, "Wrong PIN", cooldown countdown) and `state` (boolean: locked / unlocked / error / cooldown), both with a `surface` option meant to be set to `$(page:surface_id)`.
-  - [ ] Variables per satellite: `<sat>_user`, `<sat>_locked`, `<sat>_remaining`; global `last_surface_id`.
-  - [ ] Presets: keypad, display, logout, countdown.
+- [x] **Phase 2 — Buttons.** Exercised offline (faked Companion context); not yet run in Companion.
+  - [x] Feedbacks: `entry_display` (advanced: `●●○○` / `●●` / "Enter PIN", "Wrong PIN" for 2s, user name when unlocked) and `state` (boolean: locked / unlocked / wrong PIN), both with a `surface` option defaulting to `$(page:surface_id)`. Cooldown display moves to Phase 3 with the cooldown itself.
+  - [x] Variables per satellite: `sat_<id>_user`, `sat_<id>_locked`, `sat_<id>_remaining` (ticks each second while unlocked); global `last_surface_id`. `<id>` is the surface ID with characters outside `A-Za-z0-9_-` replaced by `_`; IDs that collide are rejected in config.
+  - [x] Presets: keypad (0–9, ⌫, CLR, OK), PIN display (with red wrong-PIN state), logout.
+  - Dropped: countdown preset. Landing pages are per user and shared between satellites, so a button there can't know which satellite's countdown to show. `sat_<id>_remaining` stays for anyone who builds per-satellite pages.
 - [ ] **Phase 3 — Hardening.**
   - [ ] Attempt limit and cooldown: `maxAttempts` and `cooldown` config, per-surface attempt counter.
   - [ ] `lock_all` admin action.

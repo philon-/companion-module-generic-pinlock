@@ -8,7 +8,13 @@ export type ModuleConfig = {
 }
 
 export type User = { name: string; pin: string; landingPage: number }
-export type Satellite = { surfaceId: string; lockPage: number; label: string }
+export type Satellite = {
+	surfaceId: string
+	lockPage: number
+	label: string
+	/** Surface ID made safe for variable names, used in `sat_<variableId>_*` */
+	variableId: string
+}
 
 export type ParsedConfig = {
 	/** Keyed by PIN — a PIN identifies its user, so PINs are unique */
@@ -112,15 +118,22 @@ export function ParseConfig(config: ModuleConfig): ParsedConfig {
 		}
 	}
 
+	const variableIds = new Map<string, string>()
 	for (const { lineNo, parts } of configLines(config.satellites)) {
 		const [surfaceId, page, label] = parts
 		const lockPage = parsePage(page)
+		const variableId = surfaceId ? surfaceId.replace(/[^A-Za-z0-9_-]/g, '_') : ''
 		if (parts.length < 2 || parts.length > 3 || !surfaceId || lockPage === undefined) {
 			errors.push(`Satellites line ${lineNo}: expected "surface ID, lock page[, label]"`)
 		} else if (satellites.has(surfaceId)) {
 			errors.push(`Satellites line ${lineNo}: ${surfaceId} is listed twice`)
+		} else if (variableIds.has(variableId)) {
+			errors.push(
+				`Satellites line ${lineNo}: ${surfaceId} and ${variableIds.get(variableId)} would share variable names (sat_${variableId}_*)`,
+			)
 		} else {
-			satellites.set(surfaceId, { surfaceId, lockPage, label: label || surfaceId })
+			variableIds.set(variableId, surfaceId)
+			satellites.set(surfaceId, { surfaceId, lockPage, label: label || surfaceId, variableId })
 		}
 	}
 
