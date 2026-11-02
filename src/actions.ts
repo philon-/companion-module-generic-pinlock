@@ -1,6 +1,16 @@
 import type ModuleInstance from './main.js'
 
 export type ActionsSchema = {
+	digit: {
+		options: {
+			digit: string
+		}
+	}
+	backspace: { options: Record<string, never> }
+	clear: { options: Record<string, never> }
+	submit: { options: Record<string, never> }
+	touch: { options: Record<string, never> }
+	logout: { options: Record<string, never> }
 	spike_navigate: {
 		options: {
 			page: number
@@ -15,6 +25,60 @@ export type ActionsSchema = {
 
 export function UpdateActions(self: ModuleInstance): void {
 	self.setActionDefinitions({
+		digit: {
+			name: 'Enter digit',
+			description: 'Adds a digit to the PIN being entered on this surface.',
+			options: [
+				{
+					id: 'digit',
+					type: 'dropdown',
+					label: 'Digit',
+					default: '1',
+					choices: Array.from({ length: 10 }, (_, digit) => ({ id: `${digit}`, label: `${digit}` })),
+				},
+			],
+			callback: async (event) => {
+				self.enterDigit(event.surfaceId, event.options.digit)
+			},
+		},
+		backspace: {
+			name: 'Delete last digit',
+			options: [],
+			callback: async (event) => {
+				self.deleteDigit(event.surfaceId)
+			},
+		},
+		clear: {
+			name: 'Clear entry',
+			options: [],
+			callback: async (event) => {
+				self.clearEntry(event.surfaceId)
+			},
+		},
+		submit: {
+			name: 'Submit PIN',
+			description: 'Checks the entered PIN and, if it matches a user, opens their landing page on this surface.',
+			options: [],
+			callback: async (event) => {
+				self.submitPin(event.surfaceId)
+			},
+		},
+		touch: {
+			name: 'Touch (keep session alive)',
+			description: 'Add to every button on protected pages. Restarts the idle timer for this surface.',
+			options: [],
+			callback: async (event) => {
+				self.touch(event.surfaceId)
+			},
+		},
+		logout: {
+			name: 'Log out',
+			description: 'Ends the session on this surface and returns it to its lock page.',
+			options: [],
+			callback: async (event) => {
+				self.logout(event.surfaceId)
+			},
+		},
 		spike_navigate: {
 			name: 'Spike: Navigate this surface to page',
 			description: 'Phase 0 test. Sends a navigation request for the surface that pressed the button.',

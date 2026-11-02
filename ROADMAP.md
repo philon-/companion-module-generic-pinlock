@@ -16,19 +16,19 @@ Target: **Companion v5.1.1** (latest at time of planning, 2026-11-02), `@compani
 - [x] **Planning.** Companion v5.1.1 source survey, architecture, decisions below.
 - [x] **Scaffold.** Repo from `bitfocus/companion-module-template-ts`, manifest/package identity, docs.
 - [ ] **Phase 0 — Spike.** Answer the [open questions](#open-questions-phase-0-spike) on a real Companion v5.1.1 install with at least one satellite.
-- [ ] **Phase 1 — Core.**
-  - [ ] Config: `users` (multiline `name, pin, landingPage`), `satellites` (multiline `surfaceId, lockPage[, label]`), `idleTimeout`, `pinLength`, `maxAttempts`, `cooldown`. Reject bad lines and duplicate PINs via connection status.
-  - [ ] Per-surface state: entry buffer, current user, idle timer, attempt counter.
-  - [ ] Actions: `digit` (0–9), `backspace`, `clear`, `submit` (or auto-submit at `pinLength`), `touch`, `logout`.
-  - [ ] Navigation channel: `nav_surface`, `nav_page`, `nav_seq`, with queued, spaced requests.
-  - [ ] Idle timeout: clear session and navigate to the lock page. Lock all satellites on startup.
-  - [ ] Log every lock, unlock and failed attempt with user and surface.
+- [x] **Phase 1 — Core.** Exercised offline (faked Companion context); not yet run in Companion.
+  - [x] Config: `users` (multiline `name, pin, landingPage`), `satellites` (multiline `surfaceId, lockPage[, label]`), `idleTimeout`, `pinLength`. Bad lines, duplicate PINs/satellites and PINs of the wrong auto-submit length are skipped and reported via connection status (`BadConfig`) and the log.
+  - [x] Per-surface state: entry buffer, current user, idle timer.
+  - [x] Actions: `digit` (0–9), `backspace`, `clear`, `submit` (or auto-submit at `pinLength`), `touch`, `logout`. Presses with no surface ID or from unlisted surfaces are ignored.
+  - [x] Navigation channel: `nav_surface`, `nav_page`, `nav_seq`, with queued, spaced requests.
+  - [x] Idle timeout: clear session and navigate to the lock page. Lock all satellites on startup and on every config change.
+  - [x] Log every lock, unlock and failed attempt with user and surface.
 - [ ] **Phase 2 — Buttons.**
   - [ ] Feedbacks: `entry_display` (advanced: `●●○○`, "Wrong PIN", cooldown countdown) and `state` (boolean: locked / unlocked / error / cooldown), both with a `surface` option meant to be set to `$(page:surface_id)`.
   - [ ] Variables per satellite: `<sat>_user`, `<sat>_locked`, `<sat>_remaining`; global `last_surface_id`.
   - [ ] Presets: keypad, display, logout, countdown.
 - [ ] **Phase 3 — Hardening.**
-  - [ ] Attempt limit and cooldown.
+  - [ ] Attempt limit and cooldown: `maxAttempts` and `cooldown` config, per-surface attempt counter.
   - [ ] `lock_all` admin action.
   - [ ] Upgrade scripts once option shapes have shipped.
 
@@ -40,6 +40,8 @@ Target: **Companion v5.1.1** (latest at time of planning, 2026-11-02), `@compani
 | Inactivity source | `pinlock: touch` action on protected buttons | Modules only see presses on their own actions. Accurate and fully in our control; costs one extra action per protected button.         |
 | Landing page      | Per user                                     | Each user lands on the same page on every satellite.                                                                                   |
 | User storage      | Multiline `textinput` in module config       | Any number of users, edited in Companion. `secret-text` can't be multiline, so PINs are plain text in the config (and in exports).     |
+| Config change     | Lock every satellite                         | Sessions were opened against the old user list. Locking is predictable and never leaves a removed user logged in.                      |
+| Bad config lines  | Skip the line, report it, keep the rest      | A skipped user simply can't log in, which is safe. Reported as `BadConfig` so it's visible in the connections list.                    |
 
 ## Architecture
 
