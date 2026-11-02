@@ -1,18 +1,18 @@
 {
 	"$schema": "../node_modules/@companion-module/base/assets/manifest.schema.json",
 	"type": "connection",
-	"id": "your-module-name",
-	"name": "your-module-name",
-	"shortname": "module-shortname",
-	"description": "A short one line description of your module",
+	"id": "generic-pinlock",
+	"name": "PIN Lock",
+	"shortname": "pinlock",
+	"description": "Per-surface PIN code lock with multiple users and idle timeout",
 	"version": "0.0.0",
 	"license": "MIT",
-	"repository": "git+https://github.com/bitfocus/companion-module-your-module-name.git",
-	"bugs": "https://github.com/bitfocus/companion-module-your-module-name/issues",
+	"repository": "git+https://github.com/philon-/companion-module-generic-pinlock.git",
+	"bugs": "https://github.com/philon-/companion-module-generic-pinlock/issues",
 	"maintainers": [
 		{
-			"name": "Your name",
-			"email": "Your email"
+			"name": "Jeremy Gallant",
+			"email": "jeremy@gallant.se"
 		}
 	],
 	"runtime": {
@@ -22,7 +22,7 @@
 		"entrypoint": "../dist/main.js"
 	},
 	"legacyIds": [],
-	"manufacturer": "Your company",
-	"products": ["Your product"],
-	"keywords": []
+	"manufacturer": "Generic",
+	"products": ["PIN Lock"],
+	"keywords": ["pin", "lock", "lockout", "security", "satellite", "login"]
 }
