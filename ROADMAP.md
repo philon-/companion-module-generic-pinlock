@@ -70,14 +70,30 @@ Why not alternatives:
 - ✅ The "any button press" trigger event drops the surface ID (`Events/Misc.ts` `#onControlPress`), so it can't drive per-surface idle timers.
 - ✅ Page variables (`$(page:<name>)`) exist since v5.1.0 (`Controls/ControlTypes/Page.ts`). Page controls have no press hooks.
 - ✅ Internal variables `$(internal:surface_<id>_page)` and `_locked` exist per connected surface (`:` in IDs replaced by `_`).
-- ✅ Config field types include `textinput` with `multiline` and `secret-text`; feedback types include `advanced` (can set button text).
+- ✅ Config field types include `textinput` with `multiline` and `secret-text`; feedback types include `advanced` (can set button text, must declare `affectedProperties` in base 2.1).
+- ✅ Variable-change triggers are throttled to one run per 50ms (`VARIABLE_TRIGGER_THROTTLE_MS` in `Events/Variable.ts`). Changes inside the window are merged into one trailing run that reads the variables' values at that moment, so the module spaces navigation requests 100ms apart (`NAV_SPACING_MS` in `main.ts`).
+- ✅ A satellite's surface ID is the `SERIAL` (or `DEVICEID`) the Satellite client sends in `ADD-DEVICE`, usually the hardware serial, so it should be stable across reconnects (`Service/Satellite/SatelliteApi.ts`, `Surface/Controller.ts` `addSatelliteDevice`).
+- ✅ **Surface: Set to page** moves the surface's group. Satellites in the same surface group share a page, so each pinlock satellite must be in its own group (the default auto-group).
 
 ## Open questions (Phase 0 spike)
 
+Answered from source: trigger batching and satellite surface ID format (see above). Still needs a live Companion v5.1.1 with at least one satellite (two for the burst test):
+
 - [ ] Does the trigger move a satellite when `nav_surface` holds its surface ID (expression mode on both fields)?
-- [ ] Does `$(page:surface_id)` resolve inside a module feedback option expression on that page?
-- [ ] How does Companion batch `variables_changed`? Determines the spacing between queued navigation requests so simultaneous unlocks don't collapse into one trigger run.
-- [ ] Exact surface ID format for Companion Satellite devices (and whether it's stable across reconnects).
+- [ ] Does `$(page:surface_id)` resolve inside a module feedback option on that page?
+- [ ] Does a burst of requests to two satellites move both (100ms spacing holds up)?
+- [ ] Confirm the satellite ID shown by `$(pinlock:last_surface_id)` matches the Surfaces tab and survives a Satellite reconnect.
+
+### Spike test procedure
+
+The `spike_*` actions and feedback are temporary and get removed in Phase 1.
+
+1. `yarn build`, then load the module as a developer module in Companion and add a **PIN Lock** connection (label `pinlock`).
+2. Create the navigation trigger: **Event:** variable `$(pinlock:nav_seq)` changed. **Action:** _Surface: Set to page_, Surface in expression mode `$(pinlock:nav_surface)`, Page in expression mode `$(pinlock:nav_page)`.
+3. On a page shown on a satellite, add a button with **Spike: Navigate this surface to page** (e.g. page 2). Press it on the satellite → it should land on page 2; `$(pinlock:last_surface_id)` shows its ID.
+4. On that page, add a page variable `surface_id` with any value, and a button with the **Spike: Show surface option** feedback (default `$(page:surface_id)`). The button should show the page variable's value.
+5. With two satellites, put **Spike: Navigate several surfaces at once** on a button with both `surfaceId=page` lines. One press should move both.
+6. Restart Satellite and check `$(pinlock:last_surface_id)` is unchanged after the next press.
 
 ## Companion setup the user does by hand
 

@@ -1,42 +1,34 @@
 import type ModuleInstance from './main.js'
 
 export type FeedbacksSchema = {
-	sample_feedback: {
-		type: 'boolean'
+	spike_surface_text: {
+		type: 'advanced'
 		options: {
-			num: number
+			surface: string
 		}
 	}
 }
 
 export function UpdateFeedbacks(self: ModuleInstance): void {
 	self.setFeedbackDefinitions({
-		sample_feedback: {
-			name: 'Example Feedback',
-			type: 'boolean',
-			defaultStyle: {
-				bgcolor: 0xff0000,
-				color: 0x000000,
-			},
+		spike_surface_text: {
+			name: 'Spike: Show surface option',
+			description: 'Phase 0 test. Shows what the Surface option resolves to, e.g. a page variable.',
+			type: 'advanced',
+			affectedProperties: ['text', 'size'],
 			options: [
 				{
-					id: 'num',
-					type: 'number',
-					label: 'Test',
-					default: 5,
-					min: 0,
-					max: 10,
-					clampValues: true, // If value is outside the min/max, clamp it to the min/max instead of rejecting the input
+					id: 'surface',
+					type: 'textinput',
+					label: 'Surface',
+					default: '$(page:surface_id)',
+					useVariables: true,
 				},
 			],
-			callback: (feedback) => {
-				console.log('Hello world!', feedback.options.num)
-				if (feedback.options.num > 5) {
-					return true
-				} else {
-					return false
-				}
-			},
+			callback: (feedback) => ({
+				text: `surface:\n${feedback.options.surface || '(empty)'}`,
+				size: 'auto',
+			}),
 		},
 	})
 }

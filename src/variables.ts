@@ -1,15 +1,17 @@
 import type ModuleInstance from './main.js'
 
 export type VariablesSchema = {
-	variable1: string
-	variable2: string
-	variable3: string
+	nav_surface: string
+	nav_page: number
+	nav_seq: number
+	last_surface_id: string
 }
 
 export function UpdateVariableDefinitions(self: ModuleInstance): void {
 	self.setVariableDefinitions({
-		variable1: { name: 'My first variable' },
-		variable2: { name: 'My second variable' },
-		variable3: { name: 'Another variable' },
+		nav_surface: { name: 'Navigation request: surface ID (used by the navigation trigger)' },
+		nav_page: { name: 'Navigation request: page number (used by the navigation trigger)' },
+		nav_seq: { name: 'Navigation request: sequence number (trigger fires on change)' },
+		last_surface_id: { name: 'Surface ID of the last surface that pressed a pinlock button' },
 	})
 }
