@@ -4,9 +4,9 @@ PIN code lock for Bitfocus Companion surfaces. Each surface (e.g. a Companion Sa
 
 Requires **Companion v5.1 or later** (it relies on page variables).
 
-> **Not yet tested in a live Companion install.** The logic has been exercised offline; see [ROADMAP.md](./ROADMAP.md) for what still needs verifying.
+> **Not yet tested in a live Companion install.** The logic has been exercised offline; [ROADMAP.md](./ROADMAP.md) lists what still needs verifying, along with the design decisions behind the module.
 
-See also [HELP.md](./companion/HELP.md) (shown inside Companion), [ROADMAP.md](./ROADMAP.md) and [LICENSE](./LICENSE).
+[HELP.md](./companion/HELP.md) is the short version of this guide that Companion shows next to the connection. License: [MIT](./LICENSE).
 
 ## How it fits together
 
@@ -171,8 +171,15 @@ The `Spike:` actions and feedback are temporary test tools and will be removed b
 
 ## Development
 
-Executing a `yarn` command should perform all necessary steps to develop the module, if it does not then follow the steps below.
+| Command        | Does                                                               |
+| -------------- | ------------------------------------------------------------------ |
+| `yarn install` | Installs dependencies and the pre-commit hook                      |
+| `yarn build`   | Compiles to `dist/`, which is enough for Companion to load it      |
+| `yarn dev`     | Recompiles on every change                                         |
+| `yarn lint`    | ESLint and Prettier checks (config from `@companion-module/tools`) |
+| `yarn format`  | Applies Prettier formatting                                        |
+| `yarn package` | Builds and packages the module as a `.tgz` for distribution        |
 
-The module can be built once with `yarn build`. This should be enough to get the module to be loadable by companion.
+To try it in Companion, point Companion's developer modules folder at the folder that contains this repo and run `yarn dev`.
 
-While developing the module, by using `yarn dev` the compiler will be run in watch mode to recompile the files on change.
+Code lives in `src/`: `main.ts` holds all state and logic, `config.ts` parses the users and satellites lists, and `actions.ts`, `feedbacks.ts`, `variables.ts` and `presets.ts` define what Companion shows. [CLAUDE.md](./CLAUDE.md) has the code conventions.

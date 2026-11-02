@@ -8,6 +8,14 @@ Locks Companion surfaces (typically Companion Satellites) behind a PIN, with mul
 
 A module can't change a surface's page. The module publishes navigation requests as variables (`nav_surface`, `nav_page`, `nav_seq`) and a user-created Companion trigger runs **Surface: Set to page**. Keep that contract stable — it's wired by hand in every install. Read [ROADMAP.md](./ROADMAP.md) (architecture, decisions, verified Companion facts) before changing behaviour.
 
+## Documentation
+
+Each doc has one audience; keep them consistent when behaviour changes.
+
+- **README.md** — the user guide on GitHub: worked example, wiring, variables, limitations.
+- **companion/HELP.md** — the short in-app version of the README, shown next to the connection in Companion.
+- **ROADMAP.md** — status, live-verification checklist, design decisions and the Companion facts they rely on.
+
 ## Conventions
 
 - **ESM.** Relative imports use `.js` extensions (`verbatimModuleSyntax` requires it).
@@ -22,5 +30,6 @@ A module can't change a surface's page. The module publishes navigation requests
 ## Before considering a change done
 
 - `yarn build` and `yarn lint` pass with zero errors and no suppressions.
+- Behaviour changes are exercised. There's no test suite; run the built module from a scratch script instead: `new ModuleInstance(ctx)` from `dist/main.js`, where `ctx` is a `Proxy` over `{ _isInstanceContext: true, id: 'test', label: 'pinlock' }` that returns a no-op (or a recorder) for every other property. Drive it through the public methods and `getSurfaceView`, and record `setVariableValues` calls to see navigation requests.
 - Never commit with `--no-verify`.
-- Update ROADMAP.md's checklists when work lands, and keep changes scoped to the phase being worked on.
+- Update ROADMAP.md's checklists, and README.md/HELP.md where users see the change, when work lands. Keep changes scoped to the ROADMAP item being worked on.
