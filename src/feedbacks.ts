@@ -12,7 +12,7 @@ export type FeedbacksSchema = {
 		type: 'boolean'
 		options: {
 			surface: string
-			state: 'locked' | 'unlocked' | 'wrong_pin'
+			state: 'locked' | 'unlocked' | 'wrong_pin' | 'cooldown'
 		}
 	}
 	spike_surface_text: {
@@ -53,6 +53,8 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 						return { text: view.user }
 					case 'wrong_pin':
 						return { text: 'Wrong PIN' }
+					case 'cooldown':
+						return { text: `Too many attempts\nWait ${view.seconds}s` }
 					case 'locked': {
 						if (view.pinLength > 0) {
 							return { text: '●'.repeat(view.entryLength) + '○'.repeat(view.pinLength - view.entryLength) }
@@ -64,7 +66,8 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 		},
 		state: {
 			name: 'Satellite state',
-			description: 'True when the satellite is in the chosen state. "Locked" includes a wrong-PIN flash.',
+			description:
+				'True when the satellite is in the chosen state. "Locked" includes the wrong-PIN flash and the lockout after too many attempts.',
 			type: 'boolean',
 			defaultStyle: {
 				bgcolor: 0xcc0000,
@@ -81,6 +84,7 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 						{ id: 'locked', label: 'Locked' },
 						{ id: 'unlocked', label: 'Unlocked' },
 						{ id: 'wrong_pin', label: 'Wrong PIN (briefly after a failed attempt)' },
+						{ id: 'cooldown', label: 'Locked out (too many wrong PINs)' },
 					],
 				},
 			],
@@ -88,11 +92,13 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 				const { status } = self.getSurfaceView(feedback.options.surface)
 				switch (feedback.options.state) {
 					case 'locked':
-						return status === 'locked' || status === 'wrong_pin'
+						return status === 'locked' || status === 'wrong_pin' || status === 'cooldown'
 					case 'unlocked':
 						return status === 'unlocked'
 					case 'wrong_pin':
 						return status === 'wrong_pin'
+					case 'cooldown':
+						return status === 'cooldown'
 				}
 			},
 		},

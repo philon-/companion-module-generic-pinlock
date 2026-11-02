@@ -30,6 +30,10 @@ const WRONG_PIN_FLASH_MS = 2000
 
 type NavRequest = { surfaceId: string; page: number }
 
+function secondsUntil(epochMs: number): number {
+	return Math.max(0, Math.ceil((epochMs - Date.now()) / 1000))
+}
+
 type SurfaceSession = {
 	entry: string
 	user: User | undefined
@@ -39,10 +43,22 @@ type SurfaceSession = {
 	wrongPinTimer: NodeJS.Timeout | undefined
 }
 
+/**
+ * Failed-attempt tracking, kept apart from the session because sessions are dropped on every lock;
+ * otherwise a Log out press on the lock page would reset the lockout.
+ */
+type SurfaceGuard = {
+	failedAttempts: number
+	/** Epoch ms when the lockout ends; undefined when not locked out */
+	cooldownUntil: number | undefined
+	cooldownTimer: NodeJS.Timeout | undefined
+}
+
 export type SurfaceView =
 	| { status: 'unmanaged' }
 	| { status: 'locked'; entryLength: number; pinLength: number }
 	| { status: 'wrong_pin' }
+	| { status: 'cooldown'; seconds: number }
 	| { status: 'unlocked'; user: string }
 
 export default class ModuleInstance extends InstanceBase<ModuleSchema> {
@@ -51,7 +67,8 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 	#users = new Map<string, User>()
 	#satellites = new Map<string, Satellite>()
 	#sessions = new Map<string, SurfaceSession>()
-	#remainingTicker: NodeJS.Timeout | undefined
+	#guards = new Map<string, SurfaceGuard>()
+	#ticker: NodeJS.Timeout | undefined
 
 	#navQueue: NavRequest[] = []
 	#navTimer: NodeJS.Timeout | undefined
@@ -124,8 +141,10 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 			clearTimeout(session.wrongPinTimer)
 		}
 		this.#sessions.clear()
-		clearInterval(this.#remainingTicker)
-		this.#remainingTicker = undefined
+		for (const guard of this.#guards.values()) clearTimeout(guard.cooldownTimer)
+		this.#guards.clear()
+		clearInterval(this.#ticker)
+		this.#ticker = undefined
 	}
 
 	/** What a feedback should show for a surface ID. */
@@ -133,6 +152,8 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		if (!this.#satellites.has(surfaceId)) return { status: 'unmanaged' }
 		const session = this.#sessions.get(surfaceId)
 		if (session?.user) return { status: 'unlocked', user: session.user.name }
+		const cooldownUntil = this.#guards.get(surfaceId)?.cooldownUntil
+		if (cooldownUntil) return { status: 'cooldown', seconds: secondsUntil(cooldownUntil) }
 		if (session?.wrongPinTimer) return { status: 'wrong_pin' }
 		return { status: 'locked', entryLength: session?.entry.length ?? 0, pinLength: this.config.pinLength }
 	}
@@ -162,9 +183,18 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		return { satellite, session }
 	}
 
-	enterDigit(surfaceId: string | undefined, digit: string): void {
+	/** Entry actions only apply to a locked surface that isn't locked out. */
+	#entryContext(surfaceId: string | undefined): { satellite: Satellite; session: SurfaceSession } | undefined {
 		const context = this.#pressContext(surfaceId)
-		if (!context || context.session.user) return
+		if (!context || context.session.user || this.#guards.get(context.satellite.surfaceId)?.cooldownUntil) {
+			return undefined
+		}
+		return context
+	}
+
+	enterDigit(surfaceId: string | undefined, digit: string): void {
+		const context = this.#entryContext(surfaceId)
+		if (!context) return
 
 		const { satellite, session } = context
 		const maxLength = this.config.pinLength > 0 ? this.config.pinLength : MAX_ENTRY_LENGTH
@@ -180,23 +210,23 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 	}
 
 	deleteDigit(surfaceId: string | undefined): void {
-		const context = this.#pressContext(surfaceId)
-		if (!context || context.session.user) return
+		const context = this.#entryContext(surfaceId)
+		if (!context) return
 		context.session.entry = context.session.entry.slice(0, -1)
 		this.#surfaceChanged(context.satellite)
 	}
 
 	clearEntry(surfaceId: string | undefined): void {
-		const context = this.#pressContext(surfaceId)
-		if (!context || context.session.user) return
+		const context = this.#entryContext(surfaceId)
+		if (!context) return
 		this.#endWrongPinFlash(context.session)
 		context.session.entry = ''
 		this.#surfaceChanged(context.satellite)
 	}
 
 	submitPin(surfaceId: string | undefined): void {
-		const context = this.#pressContext(surfaceId)
-		if (!context || context.session.user || !context.session.entry) return
+		const context = this.#entryContext(surfaceId)
+		if (!context?.session.entry) return
 		this.#submit(context.satellite, context.session)
 	}
 
@@ -204,21 +234,48 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		const user = this.#users.get(session.entry)
 		session.entry = ''
 
+		let guard = this.#guards.get(satellite.surfaceId)
+		if (!guard) {
+			guard = { failedAttempts: 0, cooldownUntil: undefined, cooldownTimer: undefined }
+			this.#guards.set(satellite.surfaceId, guard)
+		}
+
 		if (!user) {
-			this.log('warn', `Wrong PIN on ${satellite.label}`)
-			session.wrongPinTimer = setTimeout(() => {
-				session.wrongPinTimer = undefined
-				this.#surfaceChanged(satellite)
-			}, WRONG_PIN_FLASH_MS)
+			guard.failedAttempts++
+			if (this.config.maxAttempts > 0 && guard.failedAttempts >= this.config.maxAttempts) {
+				this.#startCooldown(satellite, guard)
+			} else {
+				this.log('warn', `Wrong PIN on ${satellite.label}`)
+				session.wrongPinTimer = setTimeout(() => {
+					session.wrongPinTimer = undefined
+					this.#surfaceChanged(satellite)
+				}, WRONG_PIN_FLASH_MS)
+			}
 			this.#surfaceChanged(satellite)
 			return
 		}
 
+		guard.failedAttempts = 0
 		session.user = user
 		this.log('info', `Unlocked ${satellite.label} for ${user.name}`)
 		this.#restartIdleTimer(satellite, session)
 		this.#surfaceChanged(satellite)
 		this.requestNavigation(satellite.surfaceId, user.landingPage)
+	}
+
+	#startCooldown(satellite: Satellite, guard: SurfaceGuard): void {
+		this.log(
+			'warn',
+			`${guard.failedAttempts} wrong PINs on ${satellite.label}: PIN entry blocked for ${this.config.cooldown}s`,
+		)
+		guard.failedAttempts = 0
+		guard.cooldownUntil = Date.now() + this.config.cooldown * 1000
+		guard.cooldownTimer = setTimeout(() => {
+			guard.cooldownUntil = undefined
+			guard.cooldownTimer = undefined
+			this.#surfaceChanged(satellite)
+		}, this.config.cooldown * 1000)
+		this.#ensureTicker()
 	}
 
 	#endWrongPinFlash(session: SurfaceSession): void {
@@ -239,6 +296,12 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		this.#lock(context.satellite, 'logged out')
 	}
 
+	/** Lock every satellite. Works from triggers too, since it doesn't depend on the pressing surface. */
+	lockAll(): void {
+		this.log('info', 'Locking all satellites')
+		for (const satellite of this.#satellites.values()) this.#lock(satellite, 'lock all')
+	}
+
 	#restartIdleTimer(satellite: Satellite, session: SurfaceSession): void {
 		clearTimeout(session.idleTimer)
 		session.idleDeadline = Date.now() + this.config.idleTimeout * 1000
@@ -246,7 +309,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 			session.idleTimer = undefined
 			this.#lock(satellite, `idle for ${this.config.idleTimeout}s`)
 		}, this.config.idleTimeout * 1000)
-		this.#ensureRemainingTicker()
+		this.#ensureTicker()
 	}
 
 	/** End any session on the satellite and send it to its lock page. */
@@ -269,7 +332,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 
 	#updateSatelliteVariables(satellite: Satellite): void {
 		const session = this.#sessions.get(satellite.surfaceId)
-		const remaining = session?.idleDeadline ? Math.max(0, Math.ceil((session.idleDeadline - Date.now()) / 1000)) : 0
+		const remaining = session?.idleDeadline ? secondsUntil(session.idleDeadline) : 0
 		this.setVariableValues({
 			[`sat_${satellite.variableId}_user`]: session?.user?.name ?? '',
 			[`sat_${satellite.variableId}_locked`]: !session?.user,
@@ -277,20 +340,25 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		})
 	}
 
-	/** Tick the `_remaining` variables once a second while any satellite is unlocked. */
-	#ensureRemainingTicker(): void {
-		if (this.#remainingTicker) return
-		this.#remainingTicker = setInterval(() => {
+	/**
+	 * Once a second while any satellite is unlocked or locked out: tick the `_remaining` variables
+	 * and redraw lockout countdowns.
+	 */
+	#ensureTicker(): void {
+		if (this.#ticker) return
+		this.#ticker = setInterval(() => {
 			const unlocked = [...this.#sessions.entries()].filter(([, session]) => session.user)
-			if (unlocked.length === 0) {
-				clearInterval(this.#remainingTicker)
-				this.#remainingTicker = undefined
+			const coolingDown = [...this.#guards.values()].some((guard) => guard.cooldownUntil)
+			if (unlocked.length === 0 && !coolingDown) {
+				clearInterval(this.#ticker)
+				this.#ticker = undefined
 				return
 			}
 			for (const [surfaceId] of unlocked) {
 				const satellite = this.#satellites.get(surfaceId)
 				if (satellite) this.#updateSatelliteVariables(satellite)
 			}
+			if (coolingDown) this.checkFeedbacks('entry_display', 'state')
 		}, 1000)
 	}
 

@@ -17,20 +17,23 @@ The module keeps track of who is logged in on each surface. It cannot change pag
 5. Add the **Touch** action to every button on protected pages so activity keeps the session alive, and add a **Log out** button.
 6. Remove page up/down/jump buttons from lock pages, and make sure page navigation on protected pages only reaches other protected pages. Leave Companion's built-in PIN lockout off.
 
-Saving the connection config locks every satellite.
+Saving the connection config locks every satellite and resets any lockouts.
+
+After _Wrong PINs before lockout_ failed attempts on a satellite, PIN entry there is blocked for _Lockout duration_ seconds. A correct PIN resets the count.
 
 ### Actions
 
 - **Enter digit**, **Delete last digit**, **Clear entry**, **Submit PIN**: the lock page keypad. With _Auto-submit PIN length_ set, the PIN is checked as soon as enough digits are entered.
 - **Touch (keep session alive)**: restarts the idle timer for the surface that pressed it.
 - **Log out**: locks the surface that pressed it.
+- **Lock all satellites**: locks every satellite. Can be run from a trigger, e.g. at a fixed time of day.
 
 ### Feedbacks
 
 Both take a _Surface ID_ option that defaults to `$(page:surface_id)`.
 
-- **PIN entry display**: button text showing PIN progress, "Wrong PIN", or the logged-in user.
-- **Satellite state**: true when the satellite is locked, unlocked, or showing a wrong PIN.
+- **PIN entry display**: button text showing PIN progress, "Wrong PIN", the lockout countdown, or the logged-in user.
+- **Satellite state**: true when the satellite is locked, unlocked, showing a wrong PIN, or locked out.
 
 ### Variables
 

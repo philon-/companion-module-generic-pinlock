@@ -11,6 +11,7 @@ export type ActionsSchema = {
 	submit: { options: Record<string, never> }
 	touch: { options: Record<string, never> }
 	logout: { options: Record<string, never> }
+	lock_all: { options: Record<string, never> }
 	spike_navigate: {
 		options: {
 			page: number
@@ -77,6 +78,14 @@ export function UpdateActions(self: ModuleInstance): void {
 			options: [],
 			callback: async (event) => {
 				self.logout(event.surfaceId)
+			},
+		},
+		lock_all: {
+			name: 'Lock all satellites',
+			description: 'Ends every session and returns every satellite to its lock page. Can be run from a trigger.',
+			options: [],
+			callback: async () => {
+				self.lockAll()
 			},
 		},
 		spike_navigate: {

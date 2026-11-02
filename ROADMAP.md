@@ -28,10 +28,11 @@ Target: **Companion v5.1.1** (latest at time of planning, 2026-11-02), `@compani
   - [x] Variables per satellite: `sat_<id>_user`, `sat_<id>_locked`, `sat_<id>_remaining` (ticks each second while unlocked); global `last_surface_id`. `<id>` is the surface ID with characters outside `A-Za-z0-9_-` replaced by `_`; IDs that collide are rejected in config.
   - [x] Presets: keypad (0–9, ⌫, CLR, OK), PIN display (with red wrong-PIN state), logout.
   - Dropped: countdown preset. Landing pages are per user and shared between satellites, so a button there can't know which satellite's countdown to show. `sat_<id>_remaining` stays for anyone who builds per-satellite pages.
-- [ ] **Phase 3 — Hardening.**
-  - [ ] Attempt limit and cooldown: `maxAttempts` and `cooldown` config, per-surface attempt counter.
-  - [ ] `lock_all` admin action.
-  - [ ] Upgrade scripts once option shapes have shipped.
+- [ ] **Phase 3 — Hardening.** Exercised offline (faked Companion context); not yet run in Companion.
+  - [x] Attempt limit and cooldown: `maxAttempts` (default 5, 0 = no limit) and `cooldown` (default 30s) config. Counted per satellite, reset by a correct PIN. Kept outside the session so a lock or Log out press can't reset it; only a config change does. `entry_display` shows a countdown, `state` gains a "Locked out" choice.
+  - [x] `lock_all` admin action (works from triggers).
+  - [ ] Upgrade scripts — nothing to do until a release ships; add one only when a shipped option shape changes.
+- [ ] **Before first release.** Remove the `spike_*` actions and feedback once the Phase 0 spike has been run.
 
 ## Decisions
 

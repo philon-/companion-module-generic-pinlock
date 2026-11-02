@@ -5,6 +5,8 @@ export type ModuleConfig = {
 	satellites: string
 	idleTimeout: number
 	pinLength: number
+	maxAttempts: number
+	cooldown: number
 }
 
 export type User = { name: string; pin: string; landingPage: number }
@@ -74,6 +76,26 @@ export function GetConfigFields(): SomeCompanionConfigField[] {
 			min: 0,
 			max: 12,
 			default: 0,
+		},
+		{
+			type: 'number',
+			id: 'maxAttempts',
+			label: 'Wrong PINs before lockout (0 = no limit)',
+			description: 'Counted per satellite. A correct PIN resets the count.',
+			width: 6,
+			min: 0,
+			max: 100,
+			default: 5,
+		},
+		{
+			type: 'number',
+			id: 'cooldown',
+			label: 'Lockout duration (seconds)',
+			description: 'How long PIN entry is blocked on a satellite after too many wrong PINs.',
+			width: 6,
+			min: 5,
+			max: 3600,
+			default: 30,
 		},
 	]
 }
