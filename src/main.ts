@@ -1,5 +1,5 @@
 import { InstanceBase, InstanceStatus, type SomeCompanionConfigField } from '@companion-module/base'
-import { GetConfigFields, ParseConfig, type ModuleConfig, type Satellite, type User } from './config.js'
+import { GetConfigFields, MAX_PIN_LENGTH, ParseConfig, type ModuleConfig, type Satellite, type User } from './config.js'
 import { UpdateVariableDefinitions, type VariablesSchema } from './variables.js'
 import { UpgradeScripts } from './upgrades.js'
 import { UpdateActions, type ActionsSchema } from './actions.js'
@@ -21,9 +21,6 @@ export { UpgradeScripts }
  * per 50ms and merges changes inside that window, so back-to-back requests would be lost.
  */
 const NAV_SPACING_MS = 100
-
-/** Longest entry accepted when auto-submit is off; matches the longest valid PIN. */
-const MAX_ENTRY_LENGTH = 12
 
 /** How long the "Wrong PIN" state is shown after a failed attempt. */
 const WRONG_PIN_FLASH_MS = 2000
@@ -197,7 +194,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		if (!context) return
 
 		const { satellite, session } = context
-		const maxLength = this.config.pinLength > 0 ? this.config.pinLength : MAX_ENTRY_LENGTH
+		const maxLength = this.config.pinLength > 0 ? this.config.pinLength : MAX_PIN_LENGTH
 		if (session.entry.length >= maxLength) return
 		this.#endWrongPinFlash(session)
 		session.entry += digit
@@ -212,6 +209,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 	deleteDigit(surfaceId: string | undefined): void {
 		const context = this.#entryContext(surfaceId)
 		if (!context) return
+		this.#endWrongPinFlash(context.session)
 		context.session.entry = context.session.entry.slice(0, -1)
 		this.#surfaceChanged(context.satellite)
 	}
@@ -285,7 +283,14 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 
 	touch(surfaceId: string | undefined): void {
 		const context = this.#pressContext(surfaceId)
-		if (!context?.session.user) return
+		if (!context) return
+		if (!context.session.user) {
+			// A protected button pressed while locked means a lock navigation never landed, e.g. the
+			// satellite was offline at the time or reconnected onto its last page. Send it back.
+			this.log('warn', `${context.satellite.label} used a protected button while locked; returning it to its lock page`)
+			this.requestNavigation(context.satellite.surfaceId, context.satellite.lockPage)
+			return
+		}
 		this.#restartIdleTimer(context.satellite, context.session)
 		this.#updateSatelliteVariables(context.satellite)
 	}

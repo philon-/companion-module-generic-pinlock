@@ -90,7 +90,7 @@ Answered from source: trigger batching and satellite surface ID format (see abov
 
 ### Spike test procedure
 
-The `spike_*` actions and feedback are temporary and get removed in Phase 1.
+The `spike_*` actions and feedback are temporary and get removed before the first release.
 
 1. `yarn build`, then load the module as a developer module in Companion and add a **PIN Lock** connection (label `pinlock`).
 2. Create the navigation trigger: **Event:** variable `$(pinlock:nav_seq)` changed. **Action:** _Surface: Set to page_, Surface in expression mode `$(pinlock:nav_surface)`, Page in expression mode `$(pinlock:nav_page)`.
@@ -114,4 +114,5 @@ The `spike_*` actions and feedback are temporary and get removed in Phase 1.
 
 - **Convenience lock, not access control.** Anyone with the Companion web UI or emulator can bypass it.
 - **Reconnects aren't observed.** A satellite that drops while unlocked comes back on its lock page (startup page), but the module's session stays open until the idle timer expires. A new PIN entry just starts a fresh session, so nothing is exposed.
+- **Missed lock navigations are caught on the next Touch, not before.** If a locked satellite ends up on a protected page (offline when it was locked, _Use Last Page At Startup_ on, trigger disabled), its next press on a Touch button sends it back to the lock page. That press's own actions still run, because a module can't cancel other connections' actions.
 - **Activity outside `touch`** (e.g. a button without the touch action) doesn't extend the session.

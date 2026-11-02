@@ -148,12 +148,12 @@ Ways to use them:
 
 ## Actions and feedbacks
 
-| Action                                                     | Use on                  | Effect                                                                        |
-| ---------------------------------------------------------- | ----------------------- | ----------------------------------------------------------------------------- |
-| Enter digit / Delete last digit / Clear entry / Submit PIN | Lock pages              | PIN entry on the pressing surface. Ignored while it's unlocked or locked out. |
-| Touch (keep session alive)                                 | Every protected button  | Restarts the pressing surface's idle timer                                    |
-| Log out                                                    | Landing pages           | Locks the pressing surface                                                    |
-| Lock all satellites                                        | Admin button or trigger | Locks every listed satellite                                                  |
+| Action                                                     | Use on                  | Effect                                                                                   |
+| ---------------------------------------------------------- | ----------------------- | ---------------------------------------------------------------------------------------- |
+| Enter digit / Delete last digit / Clear entry / Submit PIN | Lock pages              | PIN entry on the pressing surface. Ignored while it's unlocked or locked out.            |
+| Touch (keep session alive)                                 | Every protected button  | Restarts the pressing surface's idle timer; sends a locked surface back to its lock page |
+| Log out                                                    | Landing pages           | Locks the pressing surface                                                               |
+| Lock all satellites                                        | Admin button or trigger | Locks every listed satellite                                                             |
 
 | Feedback          | Options                                                       | Shows                                                                                |
 | ----------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
@@ -167,6 +167,7 @@ The `Spike:` actions and feedback are temporary test tools and will be removed b
 - **A convenience lock, not access control.** Anyone with access to the Companion web UI or emulator can get past it. Set an admin password on Companion and keep the emulator off untrusted networks.
 - **PINs are stored in plain text** in the connection config, and are included in Companion exports.
 - **Reconnects aren't detected.** A satellite that drops while unlocked comes back on its lock page (its startup page), but the session stays open until the idle timer runs out. Entering a PIN just starts a new session.
+- **A missed lock is caught on the next press, not before.** If a locked satellite ends up on a protected page (for example it was offline when it was locked, or the trigger was disabled), its next press on a button with Touch sends it back to its lock page. That press's own actions still run.
 
 ## Development
 

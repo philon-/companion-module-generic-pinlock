@@ -26,7 +26,9 @@ export type ParsedConfig = {
 	errors: string[]
 }
 
-const PIN_PATTERN = /^\d{1,12}$/
+/** Longest PIN, and so the longest entry the keypad accepts. */
+export const MAX_PIN_LENGTH = 12
+const PIN_PATTERN = new RegExp(`^\\d{1,${MAX_PIN_LENGTH}}$`)
 
 export function GetConfigFields(): SomeCompanionConfigField[] {
 	return [
@@ -74,7 +76,7 @@ export function GetConfigFields(): SomeCompanionConfigField[] {
 			description: 'When set, every PIN must have exactly this many digits.',
 			width: 6,
 			min: 0,
-			max: 12,
+			max: MAX_PIN_LENGTH,
 			default: 0,
 		},
 		{
@@ -130,7 +132,7 @@ export function ParseConfig(config: ModuleConfig): ParsedConfig {
 		if (parts.length !== 3 || !name || !pin || landingPage === undefined) {
 			errors.push(`Users line ${lineNo}: expected "name, pin, landing page"`)
 		} else if (!PIN_PATTERN.test(pin)) {
-			errors.push(`Users line ${lineNo} (${name}): PIN must be 1-12 digits`)
+			errors.push(`Users line ${lineNo} (${name}): PIN must be 1-${MAX_PIN_LENGTH} digits`)
 		} else if (config.pinLength > 0 && pin.length !== config.pinLength) {
 			errors.push(`Users line ${lineNo} (${name}): PIN must be ${config.pinLength} digits (auto-submit length)`)
 		} else if (users.has(pin)) {
